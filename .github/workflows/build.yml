@@ -2,43 +2,41 @@ name: Build GameServerHook (Win7 Compatible)
 
 on:
   push:
-    branches:
-      - main
-  workflow_dispatch:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: windows-2019
 
     steps:
     - name: Checkout
       uses: actions/checkout@v4
 
     - name: Install Windows SDK 8.1
-      shell: powershell
       run: |
-        Invoke-WebRequest -Uri "https://go.microsoft.com/fwlink/p/?LinkId=323507" -OutFile sdksetup.exe
-        Start-Process .\sdksetup.exe -ArgumentList "/features OptionId.WindowsDesktop, OptionId.NetFxSoftwareDevelopmentKit /q" -Wait
+        curl -L -o sdk81.exe "https://go.microsoft.com/fwlink/p/?LinkId=323507"
+        .\sdk81.exe /features OptionId.WindowsSDKDesktop /quiet /norestart
 
-    - name: Install Visual Studio 2017 Build Tools + v141_xp
-      shell: powershell
+    - name: Install VS2017 Build Tools + v141_xp
       run: |
-        Invoke-WebRequest "https://aka.ms/vs/15/release/vs_BuildTools.exe" -OutFile vs_BuildTools.exe
-        Start-Process .\vs_BuildTools.exe -ArgumentList `
-          "--quiet --wait --norestart `
-           --add Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
-           --add Microsoft.VisualStudio.Component.VC.140 `
-           --add Microsoft.VisualStudio.ComponentGroup.NativeDesktop.WinXP" -Wait
+        curl -L -o vs_buildtools.exe "https://aka.ms/vs/17/release/vs_BuildTools.exe"
+        .\vs_buildtools.exe --quiet --wait --norestart `
+          --add Microsoft.VisualStudio.Workload.VCTools `
+          --add Microsoft.VisualStudio.Component.VC.140 `
+          --add Microsoft.VisualStudio.Component.WinXP `
+          --includeRecommended
 
     - name: Add MSBuild to PATH
       uses: microsoft/setup-msbuild@v2
 
     - name: Build GameServerHook (Release Win32)
-      run: msbuild GameServerHook.sln /p:Configuration=Release /p:Platform=Win32 /m
+      run: |
+        msbuild GameServerHook.sln /p:Configuration=Release /p:Platform=Win32 /m
 
     - name: Upload DLL Artifact
       uses: actions/upload-artifact@v4
       with:
         name: GameServerHook-Win7
-        path: |
-          Release\Win32\GameServerHook.dll
+        path: '**/Release/*.dll'
