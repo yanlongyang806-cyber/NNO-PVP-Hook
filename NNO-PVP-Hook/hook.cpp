@@ -1,40 +1,54 @@
 #include <windows.h>
+#include <cstdio>
 
-DWORD base = (DWORD)GetModuleHandleA(NULL);
+// ===== 强制全野外 PVP 的 Hook =====
+// 适配 Neverwinter 真端 GameServer.exe (自动从 scanner.exe 找到 PVP 偏移)
 
-// ★★★ 你 scanner.exe 扫描出来的偏移：0x00093A70
-DWORD addr_PVP = base + 0x00093A70;
+typedef int(__cdecl* PVP_RELATION_FUNC)(DWORD a1, DWORD a2);
+PVP_RELATION_FUNC OriginalPvpRelation = nullptr;
 
-// 这个函数会强制让游戏认为所有玩家“敌对” → 全地图 PVP
-int __declspec(naked) Hook_PVP()
+// ★★★ 全部玩家都强制为敌人 ★★★
+int __cdecl HookPvpRelation(DWORD a1, DWORD a2)
 {
-    __asm {
-        mov eax, 1      // 返回 1 = 敌对
-        ret
+    return 2;  // 0=友善 1=队伍 2=敌对
+}
+
+// DLL 入口：自动注入 Hook
+DWORD WINAPI InitHook(LPVOID)
+{
+    FILE* fp = fopen("pvp_offset.txt", "r");
+    if (!fp)
+    {
+        MessageBoxA(0, "缺少 pvp_offset.txt（请先运行 scanner.exe）", "NNO-PVP-Hook", 0);
+        return 0;
     }
-}
 
-void PatchPVP()
-{
-    DWORD old;
-    VirtualProtect((LPVOID)addr_PVP, 5, PAGE_EXECUTE_READWRITE, &old);
+    unsigned int offset = 0;
+    fscanf(fp, "%x", &offset);
+    fclose(fp);
 
-    DWORD relative = (DWORD)Hook_PVP - (addr_PVP + 5);
-    BYTE patch[5] = {
-        0xE9,
-        (BYTE)(relative & 0xFF),
-        (BYTE)((relative >> 8) & 0xFF),
-        (BYTE)((relative >> 16) & 0xFF),
-        (BYTE)((relative >> 24) & 0xFF)
-    };
+    DWORD base = (DWORD)GetModuleHandleA("GameServer.exe");
+    OriginalPvpRelation = (PVP_RELATION_FUNC)(base + offset);
 
-    memcpy((LPVOID)addr_PVP, patch, 5);
-    VirtualProtect((LPVOID)addr_PVP, 5, old, &old);
-}
+    DWORD oldProtect;
+    VirtualProtect(OriginalPvpRelation, 5, PAGE_EXECUTE_READWRITE, &oldProtect);
 
-DWORD WINAPI HookMain(LPVOID)
-{
-    Sleep(1000); // 等 GameServer 初始化完
-    PatchPVP();
+    // 写入跳转到 Hook
+    *(BYTE*)OriginalPvpRelation = 0xE9;
+    *(DWORD*)((DWORD)OriginalPvpRelation + 1) = (DWORD)HookPvpRelation - (DWORD)OriginalPvpRelation - 5;
+
+    VirtualProtect(OriginalPvpRelation, 5, oldProtect, &oldProtect);
+
+    MessageBoxA(0, "全野外 PVP Hook 已启用！", "NNO-PVP-Hook", 0);
     return 0;
+}
+
+BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID)
+{
+    if (reason == DLL_PROCESS_ATTACH)
+    {
+        DisableThreadLibraryCalls(hModule);
+        CreateThread(NULL, 0, InitHook, NULL, 0, NULL);
+    }
+    return TRUE;
 }
