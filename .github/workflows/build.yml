@@ -1,32 +1,34 @@
-name: Build GameServerHook
+name: Build GameServerHook (Win7 Compatible)
 
 on:
   push:
-    branches: [ "main" ]
-  workflow_dispatch:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: windows-2019  # 能使用 VS2017 + v141_xp
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v3
 
-    - name: Setup MSBuild
-      uses: microsoft/setup-msbuild@v2
+    - name: Add MSBuild to PATH
+      uses: microsoft/setup-msbuild@v1.3
 
-    - name: Add MSVC (VS Build Tools)
-      uses: ilammy/msvc-dev-cmd@v1
-      with:
-        arch: x86   # Win32 必须用 x86
+    - name: Install Visual Studio Toolset v141_xp
+      run: |
+        echo Installing v141_xp...
+        choco install visualstudio2017buildtools --version=15.9.49 -y
+        choco install vcredist2015 -y
 
-    - name: Build DLL
-      run: msbuild GameServerHook.sln /p:Configuration=Release /p:Platform=Win32 /m
+    - name: Build Hook DLL (Win7 Compatible)
+      run: |
+        msbuild GameServerHook.sln /p:Configuration=Release /p:Platform=Win32 /m
 
     - name: Upload DLL
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v3
       with:
         name: GameServerHook
         path: |
-          Release\GameServerHook.dll
+          GameServerHook/Release/GameServerHook.dll
