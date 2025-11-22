@@ -1,41 +1,32 @@
-
 name: Build GameServerHook
 
 on:
   push:
     branches: [ "main" ]
-  workflow_dispatch:   # 手动运行
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: windows-latest
 
     steps:
-    - name: Checkout repository
+    - name: Checkout
       uses: actions/checkout@v4
 
     - name: Setup MSBuild
       uses: microsoft/setup-msbuild@v2
 
-    - name: Setup Visual Studio Developer Command Prompt
-      uses: microsoft/vsdevcmd@v2
+    - name: Add MSVC (VS Build Tools)
+      uses: ilammy/msvc-dev-cmd@v1
       with:
-        arch: win32   # Win32 编译 DLL（NNO 真端必须 Win32）
+        arch: x86   # Win32 必须用 x86
 
-    - name: Restore solution
-      run: |
-        msbuild GameServerHook.sln -t:Restore
+    - name: Build DLL
+      run: msbuild GameServerHook.sln /p:Configuration=Release /p:Platform=Win32 /m
 
-    - name: Build solution (Release / Win32)
-      run: |
-        msbuild GameServerHook.sln `
-          /p:Configuration=Release `
-          /p:Platform=Win32 `
-          /m
-
-    - name: Upload DLL as artifact
+    - name: Upload DLL
       uses: actions/upload-artifact@v4
       with:
         name: GameServerHook
         path: |
-          Release/GameServerHook.dll
+          Release\GameServerHook.dll
