@@ -8,32 +8,34 @@ on:
 
 jobs:
   build:
-    runs-on: windows-2019
+    runs-on: windows-2022
 
     steps:
     - name: Checkout
       uses: actions/checkout@v4
 
     - name: Install Windows SDK 8.1
+      shell: powershell
       run: |
-        curl -L -o sdk81.exe "https://go.microsoft.com/fwlink/p/?LinkId=323507"
-        .\sdk81.exe /features OptionId.WindowsSDKDesktop /quiet /norestart
+        Invoke-WebRequest -Uri "https://go.microsoft.com/fwlink/p/?LinkId=323507" -OutFile sdk81.exe
+        Start-Process .\sdk81.exe -ArgumentList "/quiet", "/norestart" -Wait
 
-    - name: Install VS2017 Build Tools + v141_xp
+    - name: Install VS2017 BuildTools + v141_xp
+      shell: powershell
       run: |
-        curl -L -o vs_buildtools.exe "https://aka.ms/vs/17/release/vs_BuildTools.exe"
-        .\vs_buildtools.exe --quiet --wait --norestart `
-          --add Microsoft.VisualStudio.Workload.VCTools `
-          --add Microsoft.VisualStudio.Component.VC.140 `
-          --add Microsoft.VisualStudio.Component.WinXP `
-          --includeRecommended
+        Invoke-WebRequest -Uri "https://aka.ms/vs/15/release/vs_buildtools.exe" -OutFile vs_buildtools.exe
+        Start-Process .\vs_buildtools.exe -ArgumentList `
+          "--quiet", "--wait", "--norestart", `
+          "--add", "Microsoft.VisualStudio.Workload.VCTools", `
+          "--add", "Microsoft.VisualStudio.Component.WinXP", `
+          "--add", "Microsoft.VisualStudio.Component.VC.141.x86.x64", `
+          "--includeRecommended" -Wait
 
     - name: Add MSBuild to PATH
       uses: microsoft/setup-msbuild@v2
 
     - name: Build GameServerHook (Release Win32)
-      run: |
-        msbuild GameServerHook.sln /p:Configuration=Release /p:Platform=Win32 /m
+      run: msbuild GameServerHook.sln /p:Configuration=Release /p:Platform=Win32 /m
 
     - name: Upload DLL Artifact
       uses: actions/upload-artifact@v4
